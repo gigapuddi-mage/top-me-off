@@ -15,14 +15,14 @@ local CONSUMABLES = {
     [13446] = { name = "Major Healing Potion", target = 10 },
     [13444] = { name = "Major Mana Potion", target = 10 },
     [60977] = { name = "Danonzo's Tel'Abim Delight", target = 10 },
-    [61675] = { name = "Nordanaar Herbal Tea", target = 10 },
+    [61675] = { name = "Nordanaar Herbal Tea", target = 20 },
     -- Elixirs
     [13454] = { name = "Greater Arcane Elixir", target = 10 },
     [61224] = { name = "Dreamshard Elixir", target = 10 },
     [55048] = { name = "Elixir of Greater Arcane Power", target = 10 },
-    [8423]  = { name = "Cerebral Cortex Compound", target = 10 },
+    [8423]  = { name = "Cerebral Cortex Compound", target = 20 },
     [61423] = { name = "Dreamtonic", target = 10 },
-    [20079] = { name = "Spirit of Zanza", target = 10 },
+    [20079] = { name = "Spirit of Zanza", target = 20 },
     [3825]  = { name = "Elixir of Fortitude", target = 10 },
     [20007] = { name = "Mageblood Potion", target = 10 },
     [3386]  = { name = "Elixir of Poison Resistance", target = 10 },
@@ -41,6 +41,42 @@ local CONSUMABLES = {
     [23123] = { name = "Blessed Wizard Oil", target = 10 },
     [20749] = { name = "Brilliant Wizard Oil", target = 2 },  -- unstackable (has charges)
 }
+
+-- Settings
+local TMO_VERBOSE = false
+
+-- Colors (hex format for AddMessage)
+local COLOR_SUCCESS = "|cff00ff00"  -- Green
+local COLOR_WARNING = "|cffffff00"  -- Yellow
+local COLOR_ERROR = "|cffff0000"    -- Red
+local COLOR_INFO = "|cffffffff"     -- White
+local COLOR_RESET = "|r"
+
+-- Messaging helpers
+local function TMO_Print(msg, color)
+    color = color or COLOR_INFO
+    DEFAULT_CHAT_FRAME:AddMessage(color .. "Top Me Off: " .. msg .. COLOR_RESET)
+end
+
+local function TMO_PrintVerbose(msg, color)
+    if TMO_VERBOSE then
+        TMO_Print(msg, color)
+    end
+end
+
+-- Format money as "Xg Ys Zc"
+local function FormatMoney(copper)
+    local gold = math.floor(copper / 10000)
+    local silver = math.floor((copper % 10000) / 100)
+    local cop = copper % 100
+    if gold > 0 then
+        return gold .. "g " .. silver .. "s " .. cop .. "c"
+    elseif silver > 0 then
+        return silver .. "s " .. cop .. "c"
+    else
+        return cop .. "c"
+    end
+end
 
 -- Extract item ID from an item link
 local function GetItemIdFromLink(link)
@@ -81,6 +117,9 @@ end
 -- Main auto-buy logic
 local function TopOffReagents()
     local playerMoney = GetMoney()
+    local totalSpent = 0
+    local itemsPurchased = 0
+    local cantAfford = {}
 
     for itemId, info in pairs(REAGENTS) do
         local current = CountItemInBags(itemId)
@@ -98,14 +137,28 @@ local function TopOffReagents()
                 local totalCost = pricePerItem * needed
 
                 if playerMoney >= totalCost then
-                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: You have " .. current .. " " .. info.name .. ", purchasing " .. needed .. " to top you off.")
+                    TMO_PrintVerbose("Purchasing " .. needed .. " " .. info.name, COLOR_SUCCESS)
                     BuyMerchantItem(merchantIndex, needed)
                     playerMoney = playerMoney - totalCost
+                    totalSpent = totalSpent + totalCost
+                    itemsPurchased = itemsPurchased + 1
                 else
-                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: Can't afford " .. needed .. " " .. info.name)
+                    table.insert(cantAfford, info.name)
                 end
             end
         end
+    end
+
+    -- Summary
+    if itemsPurchased > 0 then
+        TMO_Print("Purchased " .. itemsPurchased .. " reagent type(s) for " .. FormatMoney(totalSpent), COLOR_SUCCESS)
+    else
+        TMO_PrintVerbose("Reagents already stocked", COLOR_INFO)
+    end
+
+    -- Errors
+    for _, name in ipairs(cantAfford) do
+        TMO_Print("Can't afford: " .. name, COLOR_ERROR)
     end
 end
 
@@ -229,40 +282,108 @@ end
 
 -- Bank restock logic - move consumables from bank to bags
 local function TopOffFromBank()
+    local itemsRestocked = 0
+    local bankShortages = {}
+    local noSpace = {}
+
     for itemId, info in pairs(CONSUMABLES) do
         local current = CountItemInBags(itemId)
 
         if current < info.target then
             local needed = info.target - current
-            local totalMoved = 0
-            local stacks = FindAllItemStacksInBank(itemId)
+            local bankCount = CountItemInBank(itemId)
 
-            for _, stack in ipairs(stacks) do
-                if totalMoved >= needed then break end
-
-                local stillNeeded = needed - totalMoved
-                local moving = math.min(stillNeeded, stack.count)
-
-                -- Try to find existing stack in bags first, fall back to empty slot
-                local destBag, destSlot = FindItemStackInBags(itemId)
-                if not destBag then
-                    destBag, destSlot = FindEmptyBagSlot()
+            if bankCount == 0 then
+                table.insert(bankShortages, { name = info.name, inBank = 0, needed = needed })
+            else
+                if bankCount < needed then
+                    table.insert(bankShortages, { name = info.name, inBank = bankCount, needed = needed })
                 end
 
-                if destBag then
-                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: You have " .. (current + totalMoved) .. " " .. info.name .. ", moving " .. moving .. " from bank to top you off.")
+                local totalMoved = 0
+                local stacks = FindAllItemStacksInBank(itemId)
 
-                    -- Split only the needed amount from bank and place in bags
-                    SplitContainerItem(stack.bag, stack.slot, moving)
-                    PickupContainerItem(destBag, destSlot)
+                for _, stack in ipairs(stacks) do
+                    if totalMoved >= needed then break end
 
-                    totalMoved = totalMoved + moving
-                else
-                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: No bag space for " .. info.name)
-                    break
+                    local stillNeeded = needed - totalMoved
+                    local moving = math.min(stillNeeded, stack.count)
+
+                    -- Try to find existing stack in bags first, fall back to empty slot
+                    local destBag, destSlot = FindItemStackInBags(itemId)
+                    if not destBag then
+                        destBag, destSlot = FindEmptyBagSlot()
+                    end
+
+                    if destBag then
+                        TMO_PrintVerbose("Moving " .. moving .. " " .. info.name .. " from bank", COLOR_SUCCESS)
+
+                        -- Split only the needed amount from bank and place in bags
+                        SplitContainerItem(stack.bag, stack.slot, moving)
+                        PickupContainerItem(destBag, destSlot)
+
+                        totalMoved = totalMoved + moving
+                    else
+                        table.insert(noSpace, info.name)
+                        break
+                    end
+                end
+
+                if totalMoved > 0 then
+                    itemsRestocked = itemsRestocked + 1
                 end
             end
         end
+    end
+
+    -- Summary
+    if itemsRestocked > 0 then
+        TMO_Print("Restocked " .. itemsRestocked .. " item type(s) from bank", COLOR_SUCCESS)
+    else
+        TMO_PrintVerbose("Already fully stocked", COLOR_INFO)
+    end
+
+    -- Bank shortages
+    for _, shortage in ipairs(bankShortages) do
+        if shortage.inBank == 0 then
+            TMO_Print("Out of stock: " .. shortage.name, COLOR_WARNING)
+        else
+            TMO_Print("Bank low: " .. shortage.name .. " (" .. shortage.inBank .. " in bank, need " .. shortage.needed .. ")", COLOR_WARNING)
+        end
+    end
+
+    -- No space errors
+    for _, name in ipairs(noSpace) do
+        TMO_Print("No bag space: " .. name, COLOR_ERROR)
+    end
+end
+
+-- Slash commands
+SLASH_TOPMEOFF1 = "/topmeoff"
+SLASH_TOPMEOFF2 = "/tmo"
+SlashCmdList["TOPMEOFF"] = function(msg)
+    msg = string.lower(msg or "")
+
+    if msg == "verbose" then
+        TMO_VERBOSE = not TMO_VERBOSE
+        TMO_Print("Verbose mode: " .. (TMO_VERBOSE and "ON" or "OFF"), COLOR_INFO)
+    elseif msg == "status" then
+        TMO_Print("--- Reagent Status ---", COLOR_INFO)
+        for itemId, info in pairs(REAGENTS) do
+            local current = CountItemInBags(itemId)
+            local color = current >= info.target and COLOR_SUCCESS or COLOR_WARNING
+            TMO_Print(info.name .. ": " .. current .. "/" .. info.target, color)
+        end
+
+        TMO_Print("--- Consumable Status ---", COLOR_INFO)
+        for itemId, info in pairs(CONSUMABLES) do
+            local current = CountItemInBags(itemId)
+            local bankCount = CountItemInBank(itemId)
+            local color = current >= info.target and COLOR_SUCCESS or COLOR_WARNING
+            TMO_Print(info.name .. ": " .. current .. "/" .. info.target .. " (bank: " .. bankCount .. ")", color)
+        end
+    else
+        TMO_Print("Commands: /topmeoff status | /topmeoff verbose", COLOR_INFO)
     end
 end
 
@@ -273,7 +394,7 @@ frame:RegisterEvent("MERCHANT_SHOW")
 frame:RegisterEvent("BANKFRAME_OPENED")
 frame:SetScript("OnEvent", function()
     if event == "PLAYER_LOGIN" then
-        DEFAULT_CHAT_FRAME:AddMessage("Top Me Off loaded.")
+        TMO_Print("Loaded. Type /topmeoff for commands.", COLOR_INFO)
     elseif event == "MERCHANT_SHOW" then
         TopOffReagents()
     elseif event == "BANKFRAME_OPENED" then
