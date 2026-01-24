@@ -151,6 +151,20 @@ local function FindEmptyBagSlot()
     return nil, nil
 end
 
+-- Find existing partial stack of item in bags (to stack onto), returns bag, slot or nil, nil
+local function FindItemStackInBags(itemId)
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link and GetItemIdFromLink(link) == itemId then
+                return bag, slot
+            end
+        end
+    end
+    return nil, nil
+end
+
 -- Bank restock logic - move consumables from bank to bags
 local function TopOffFromBank()
     for itemId, info in pairs(CONSUMABLES) do
@@ -160,17 +174,21 @@ local function TopOffFromBank()
             local bankBag, bankSlot = FindItemInBank(itemId)
 
             if bankBag then
-                local destBag, destSlot = FindEmptyBagSlot()
+                local _, bankStackCount = GetContainerItemInfo(bankBag, bankSlot)
+                local needed = info.target - current
+                local moving = math.min(needed, bankStackCount or 0)
+
+                -- Try to find existing stack in bags first, fall back to empty slot
+                local destBag, destSlot = FindItemStackInBags(itemId)
+                if not destBag then
+                    destBag, destSlot = FindEmptyBagSlot()
+                end
 
                 if destBag then
-                    local _, bankStackCount = GetContainerItemInfo(bankBag, bankSlot)
-                    local needed = info.target - current
-                    local moving = math.min(needed, bankStackCount or 0)
-
                     DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: You have " .. current .. " " .. info.name .. ", moving " .. moving .. " from bank to top you off.")
 
-                    -- Pick up from bank and place in bags
-                    PickupContainerItem(bankBag, bankSlot)
+                    -- Split only the needed amount from bank and place in bags
+                    SplitContainerItem(bankBag, bankSlot, moving)
                     PickupContainerItem(destBag, destSlot)
                 else
                     DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: No bag space for " .. info.name)
