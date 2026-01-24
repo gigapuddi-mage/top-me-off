@@ -181,7 +181,7 @@ end
 local function FindItemStackInBags(itemId)
     -- Get max stack size from item info
     local _, _, _, _, _, _, _, maxStack = GetItemInfo(itemId)
-    maxStack = maxStack or 1
+    maxStack = tonumber(maxStack) or 1
 
     for bag = 0, 4 do
         local numSlots = GetContainerNumSlots(bag)
