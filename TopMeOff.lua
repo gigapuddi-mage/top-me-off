@@ -179,9 +179,9 @@ end
 
 -- Find existing partial stack of item in bags (to stack onto), returns bag, slot or nil, nil
 local function FindItemStackInBags(itemId)
-    -- Get max stack size from item info
+    -- Get max stack size from item info (default to 20 if item not cached)
     local _, _, _, _, _, _, _, maxStack = GetItemInfo(itemId)
-    maxStack = tonumber(maxStack) or 1
+    maxStack = tonumber(maxStack) or 20
 
     for bag = 0, 4 do
         local numSlots = GetContainerNumSlots(bag)
