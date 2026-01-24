@@ -67,8 +67,8 @@ end
 -- Format money as "Xg Ys Zc"
 local function FormatMoney(copper)
     local gold = math.floor(copper / 10000)
-    local silver = math.floor((copper % 10000) / 100)
-    local cop = copper % 100
+    local silver = math.floor(math.mod(copper, 10000) / 100)
+    local cop = math.mod(copper, 100)
     if gold > 0 then
         return gold .. "g " .. silver .. "s " .. cop .. "c"
     elseif silver > 0 then
