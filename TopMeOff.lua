@@ -165,18 +165,49 @@ local function FindItemStackInBags(itemId)
     return nil, nil
 end
 
+-- Find all stacks of an item in bank, returns array of {bag, slot, count}
+local function FindAllItemStacksInBank(itemId)
+    local stacks = {}
+
+    -- Check main bank first
+    for slot = 1, 28 do
+        local link = GetContainerItemLink(BANK_CONTAINER, slot)
+        if link and GetItemIdFromLink(link) == itemId then
+            local _, count = GetContainerItemInfo(BANK_CONTAINER, slot)
+            table.insert(stacks, { bag = BANK_CONTAINER, slot = slot, count = count or 0 })
+        end
+    end
+
+    -- Check bank bags
+    for bag = 5, 10 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link and GetItemIdFromLink(link) == itemId then
+                local _, count = GetContainerItemInfo(bag, slot)
+                table.insert(stacks, { bag = bag, slot = slot, count = count or 0 })
+            end
+        end
+    end
+
+    return stacks
+end
+
 -- Bank restock logic - move consumables from bank to bags
 local function TopOffFromBank()
     for itemId, info in pairs(CONSUMABLES) do
         local current = CountItemInBags(itemId)
 
         if current < info.target then
-            local bankBag, bankSlot = FindItemInBank(itemId)
+            local needed = info.target - current
+            local totalMoved = 0
+            local stacks = FindAllItemStacksInBank(itemId)
 
-            if bankBag then
-                local _, bankStackCount = GetContainerItemInfo(bankBag, bankSlot)
-                local needed = info.target - current
-                local moving = math.min(needed, bankStackCount or 0)
+            for _, stack in ipairs(stacks) do
+                if totalMoved >= needed then break end
+
+                local stillNeeded = needed - totalMoved
+                local moving = math.min(stillNeeded, stack.count)
 
                 -- Try to find existing stack in bags first, fall back to empty slot
                 local destBag, destSlot = FindItemStackInBags(itemId)
@@ -185,13 +216,16 @@ local function TopOffFromBank()
                 end
 
                 if destBag then
-                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: You have " .. current .. " " .. info.name .. ", moving " .. moving .. " from bank to top you off.")
+                    DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: You have " .. (current + totalMoved) .. " " .. info.name .. ", moving " .. moving .. " from bank to top you off.")
 
                     -- Split only the needed amount from bank and place in bags
-                    SplitContainerItem(bankBag, bankSlot, moving)
+                    SplitContainerItem(stack.bag, stack.slot, moving)
                     PickupContainerItem(destBag, destSlot)
+
+                    totalMoved = totalMoved + moving
                 else
                     DEFAULT_CHAT_FRAME:AddMessage("Top Me Off: No bag space for " .. info.name)
+                    break
                 end
             end
         end
