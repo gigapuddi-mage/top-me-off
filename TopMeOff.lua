@@ -11,9 +11,35 @@ local REAGENTS = {
 -- Consumables configuration: itemId -> { name, target amount }
 -- These are restocked from bank on BANKFRAME_OPENED
 local CONSUMABLES = {
+    -- Healing/Mana
     [13446] = { name = "Major Healing Potion", target = 10 },
     [13444] = { name = "Major Mana Potion", target = 10 },
+    [60977] = { name = "Danonzo's Tel'Abim Delight", target = 10 },
+    [61675] = { name = "Nordanaar Herbal Tea", target = 10 },
+    -- Elixirs
     [13454] = { name = "Greater Arcane Elixir", target = 10 },
+    [61224] = { name = "Dreamshard Elixir", target = 10 },
+    [55048] = { name = "Elixir of Greater Arcane Power", target = 10 },
+    [8423]  = { name = "Cerebral Cortex Compound", target = 10 },
+    [61423] = { name = "Dreamtonic", target = 10 },
+    [20079] = { name = "Spirit of Zanza", target = 10 },
+    [3825]  = { name = "Elixir of Fortitude", target = 10 },
+    [20007] = { name = "Mageblood Potion", target = 10 },
+    [3386]  = { name = "Elixir of Poison Resistance", target = 10 },
+    -- Potions
+    [9036]  = { name = "Magic Resistance Potion", target = 10 },
+    [3387]  = { name = "Limited Invulnerability Potion", target = 10 },
+    [61181] = { name = "Potion of Quickness", target = 10 },
+    [12450] = { name = "Juju Flurry", target = 10 },
+    -- Protection Potions
+    [13461] = { name = "Greater Arcane Protection Potion", target = 10 },
+    [13458] = { name = "Greater Nature Protection Potion", target = 10 },
+    [13457] = { name = "Greater Fire Protection Potion", target = 10 },
+    [13459] = { name = "Greater Shadow Protection Potion", target = 10 },
+    [13456] = { name = "Greater Frost Protection Potion", target = 10 },
+    -- Wizard Oils
+    [23123] = { name = "Blessed Wizard Oil", target = 10 },
+    [20749] = { name = "Brilliant Wizard Oil", target = 2 },  -- unstackable (has charges)
 }
 
 -- Extract item ID from an item link
@@ -153,12 +179,20 @@ end
 
 -- Find existing partial stack of item in bags (to stack onto), returns bag, slot or nil, nil
 local function FindItemStackInBags(itemId)
+    -- Get max stack size from item info
+    local _, _, _, _, _, _, _, maxStack = GetItemInfo(itemId)
+    maxStack = maxStack or 1
+
     for bag = 0, 4 do
         local numSlots = GetContainerNumSlots(bag)
         for slot = 1, numSlots do
             local link = GetContainerItemLink(bag, slot)
             if link and GetItemIdFromLink(link) == itemId then
-                return bag, slot
+                local _, count = GetContainerItemInfo(bag, slot)
+                -- Skip if stack is full
+                if (count or 0) < maxStack then
+                    return bag, slot
+                end
             end
         end
     end
