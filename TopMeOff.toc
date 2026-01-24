@@ -1,0 +1,7 @@
+## Interface: 11200
+## Title: Top Me Off
+## Notes: Auto-organizing add-on for TurtleCraft / Turtle WoW
+## Author: Gigapuddi
+## Version: 1.0.0
+
+TopMeOff.lua
