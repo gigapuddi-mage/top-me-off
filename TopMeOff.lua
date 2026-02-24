@@ -14,7 +14,7 @@ local CONSUMABLES = {
     -- Healing/Mana
     [13446] = { name = "Major Healing Potion", target = 10 },
     [13444] = { name = "Major Mana Potion", target = 10 },
-    [60977] = { name = "Danonzo's Tel'Abim Delight", target = 10 },
+    [60977] = { name = "Danonzo's Tel'Abim Delight", target = 20 },
     [61675] = { name = "Nordanaar Herbal Tea", target = 20 },
     -- Elixirs
     [13454] = { name = "Greater Arcane Elixir", target = 10 },
@@ -30,16 +30,20 @@ local CONSUMABLES = {
     [9036]  = { name = "Magic Resistance Potion", target = 10 },
     [3387]  = { name = "Limited Invulnerability Potion", target = 10 },
     [61181] = { name = "Potion of Quickness", target = 10 },
-    [12450] = { name = "Juju Flurry", target = 10 },
+    [12450] = { name = "Juju Flurry", target = 20 },
     -- Protection Potions
     [13461] = { name = "Greater Arcane Protection Potion", target = 10 },
     [13458] = { name = "Greater Nature Protection Potion", target = 10 },
     [13457] = { name = "Greater Fire Protection Potion", target = 10 },
     [13459] = { name = "Greater Shadow Protection Potion", target = 10 },
     [13456] = { name = "Greater Frost Protection Potion", target = 10 },
+    -- Other
+    [14530] = { name = "Heavy Runecloth Bandage", target = 20 },
+    [17056] = { name = "Light Feather", target = 20 },
+    [6657]  = { name = "Savory Deviate Delight", target = 20 },
     -- Wizard Oils
-    [23123] = { name = "Blessed Wizard Oil", target = 10 },
-    [20749] = { name = "Brilliant Wizard Oil", target = 2 },  -- unstackable (has charges)
+    [23123] = { name = "Blessed Wizard Oil", target = 20 },
+    [20749] = { name = "Brilliant Wizard Oil", target = 1 },  -- unstackable (has charges)
 }
 
 -- Settings
