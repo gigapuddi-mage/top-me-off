@@ -46,6 +46,16 @@ local CONSUMABLES = {
     [20749] = { name = "Brilliant Wizard Oil", target = 1 },  -- unstackable (has charges)
 }
 
+-- Ordered consumable display list (for PrintBankSummary)
+local CONSUMABLE_CATEGORIES = {
+    { header = "Healing/Mana", items = { 13446, 13444, 60977, 61675 } },
+    { header = "Elixirs", items = { 13454, 61224, 55048, 8423, 61423, 20079, 3825, 20007, 3386 } },
+    { header = "Potions", items = { 9036, 3387, 61181, 12450 } },
+    { header = "Protection Potions", items = { 13461, 13458, 13457, 13459, 13456 } },
+    { header = "Other", items = { 14530, 17056, 6657 } },
+    { header = "Wizard Oils", items = { 23123, 20749 } },
+}
+
 -- Settings
 local TMO_VERBOSE = false
 
@@ -284,6 +294,32 @@ local function FindAllItemStacksInBank(itemId)
     return stacks
 end
 
+-- Print a color-coded summary of all consumables when bank opens
+local function PrintBankSummary()
+    DEFAULT_CHAT_FRAME:AddMessage(COLOR_INFO .. "--- Top Me Off ---" .. COLOR_RESET)
+
+    for _, category in ipairs(CONSUMABLE_CATEGORIES) do
+        DEFAULT_CHAT_FRAME:AddMessage(COLOR_INFO .. "  " .. category.header .. COLOR_RESET)
+
+        for _, itemId in ipairs(category.items) do
+            local info = CONSUMABLES[itemId]
+            if info then
+                local bagCount = CountItemInBags(itemId)
+                local bankCount = CountItemInBank(itemId)
+                local color
+                if bagCount >= info.target then
+                    color = COLOR_SUCCESS
+                elseif bankCount > 0 then
+                    color = COLOR_WARNING
+                else
+                    color = COLOR_ERROR
+                end
+                DEFAULT_CHAT_FRAME:AddMessage(color .. "    " .. info.name .. ": " .. bagCount .. "/" .. info.target .. " bags | " .. bankCount .. " bank" .. COLOR_RESET)
+            end
+        end
+    end
+end
+
 -- Bank restock logic - move consumables from bank to bags
 local function TopOffFromBank()
     local itemsRestocked = 0
@@ -402,6 +438,7 @@ frame:SetScript("OnEvent", function()
     elseif event == "MERCHANT_SHOW" then
         TopOffReagents()
     elseif event == "BANKFRAME_OPENED" then
+        PrintBankSummary()
         TopOffFromBank()
     end
 end)
